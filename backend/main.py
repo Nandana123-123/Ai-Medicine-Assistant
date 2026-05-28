@@ -1,14 +1,11 @@
-# main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.auth import router as auth_router
 from routes.medicine import router as medicine_router
+from routes.chatbot import router as chatbot_router
+from routes.profile import router as profile_router
 
-app = FastAPI(
-    title="AI Medicine Assistant",
-    description="AI-Based Medicine Identification",
-    version="1.0.0"
-)
+app = FastAPI(title="AI Medicine Assistant", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,17 +15,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routes
-app.include_router(auth_router, tags=["Authentication"])
+app.include_router(auth_router, tags=["Auth"])
 app.include_router(medicine_router, tags=["Medicine"])
-
+app.include_router(chatbot_router, tags=["Chatbot"])
+app.include_router(profile_router, prefix="/user", tags=["Profile"])
 
 @app.get("/")
 async def root():
-    return {
-        "message": "AI Medicine Assistant API Running!",
-        "status": "healthy"
-    }
+    return {"message": "AI Medicine Assistant Running!", "status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,6 +1,4 @@
 # translate_service.py
-# Translates medicine info to Kannada
-
 from deep_translator import GoogleTranslator
 
 
@@ -10,21 +8,26 @@ def translate_to_kannada(text: str) -> str:
         if not text or len(text.strip()) == 0:
             return text
 
-        translator = GoogleTranslator(
-            source='english',
-            target='kannada'
-        )
+        # Split into chunks of 500 chars for better translation
+        if len(text) <= 500:
+            translator = GoogleTranslator(source='auto', target='kn')
+            result = translator.translate(text)
+            return result if result else text
 
-        # Split long text into chunks (max 4000 chars)
-        if len(text) > 4000:
-            text = text[:4000]
+        # For longer text, translate in chunks
+        chunks = [text[i:i+500] for i in range(0, len(text), 500)]
+        translated_chunks = []
 
-        translated = translator.translate(text)
-        return translated
+        for chunk in chunks:
+            translator = GoogleTranslator(source='auto', target='kn')
+            translated = translator.translate(chunk)
+            translated_chunks.append(translated if translated else chunk)
+
+        return ' '.join(translated_chunks)
 
     except Exception as e:
         print(f"Translation error: {str(e)}")
-        return text  # Return original if translation fails
+        return text
 
 
 def translate_medicine_data(medicine_data: dict) -> dict:
@@ -32,16 +35,20 @@ def translate_medicine_data(medicine_data: dict) -> dict:
     try:
         kannada_data = {}
 
+        # These fields get translated
         fields_to_translate = [
             "uses", "advantages", "side_effects",
             "warnings", "simple_explanation",
-            "when_to_see_doctor"
+            "when_to_see_doctor", "dosage",
+            "storage", "category"
         ]
 
         for key, value in medicine_data.items():
             if key in fields_to_translate and value:
+                print(f"Translating {key}...")
                 kannada_data[key] = translate_to_kannada(str(value))
             else:
+                # Keep original for name fields
                 kannada_data[key] = value
 
         return kannada_data

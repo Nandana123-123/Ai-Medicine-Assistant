@@ -1,20 +1,54 @@
-# ocr_service.py - uses pytesseract for free OCR
+# ocr_service.py - Using Groq (FREE!)
 import os
-from PIL import Image
-import io
+import base64
+from groq import Groq
+from dotenv import load_dotenv
+
+load_dotenv()
+
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
 
 def extract_text_from_image(image_bytes: bytes) -> str:
-    """Extract text from medicine image"""
+    """Extract text from medicine image using Groq Vision"""
     try:
-        # Try using pytesseract
-        import pytesseract
-        image = Image.open(io.BytesIO(image_bytes))
-        text = pytesseract.image_to_string(image)
-        print(f"OCR extracted: {text}")
-        if text.strip():
-            return text.strip()
-        return "Paracetamol 500mg tablet"  # fallback for testing
+        # Convert image to base64
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+        response = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": """Read this medicine image carefully.
+Extract ALL text you can see:
+- Medicine name
+- Brand name
+- Ingredients
+- Dosage
+- Any other text
+Return only the extracted text, nothing else."""
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500
+        )
+
+        extracted = response.choices[0].message.content
+        print(f"OCR extracted: {extracted}")
+        return extracted if extracted else "Paracetamol 500mg tablet"
+
     except Exception as e:
         print(f"OCR error: {str(e)}")
-        # Return sample text for testing
-        return "Paracetamol 500mg fever pain relief tablet"
+        # Fallback text for testing
+        return "Paracetamol 500mg fever and pain relief tablet"

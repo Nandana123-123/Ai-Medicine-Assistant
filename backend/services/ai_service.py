@@ -1,16 +1,16 @@
-# ai_service.py
+# ai_service.py - Using Groq (FREE!)
 import os
 import json
-from openai import OpenAI
+from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+MODEL = "llama-3.3-70b-versatile"
 
 
 def get_default_medicine_response() -> dict:
-    """Default response when AI fails"""
     return {
         "medicine_name": "Unknown Medicine",
         "generic_name": "Not identified",
@@ -30,17 +30,17 @@ def get_default_medicine_response() -> dict:
 def identify_medicine(ocr_text: str) -> dict:
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=MODEL,
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a medical assistant. Reply with valid JSON only."
+                    "content": "You are a medical assistant. Reply with valid JSON only. No extra text."
                 },
                 {
                     "role": "user",
                     "content": f"""Based on this medicine text: "{ocr_text}"
 
-Return this exact JSON:
+Return ONLY this JSON, nothing else:
 {{
     "medicine_name": "name here",
     "generic_name": "generic name",
@@ -53,7 +53,7 @@ Return this exact JSON:
     "warnings": "warnings",
     "storage": "storage info",
     "when_to_see_doctor": "when to see doctor",
-    "simple_explanation": "simple explanation"
+    "simple_explanation": "simple explanation for uneducated users"
 }}"""
                 }
             ],
@@ -61,12 +61,18 @@ Return this exact JSON:
         )
 
         result = response.choices[0].message.content.strip()
+
+        # Clean markdown if present
         if "```" in result:
             result = result.split("```")[1]
             if result.startswith("json"):
                 result = result[4:]
+
         return json.loads(result.strip())
 
+    except json.JSONDecodeError:
+        print("JSON parse error - returning default")
+        return get_default_medicine_response()
     except Exception as e:
         print(f"AI error: {str(e)}")
         return get_default_medicine_response()
@@ -75,15 +81,20 @@ Return this exact JSON:
 def simplify_for_uneducated_user(medicine_data: dict) -> str:
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=MODEL,
             messages=[
                 {
                     "role": "user",
-                    "content": f"Explain simply in 3 sentences for uneducated users. Medicine: {medicine_data.get('medicine_name')}, Uses: {medicine_data.get('uses')}"
+                    "content": f"""Explain in very simple words for uneducated rural users. 
+Maximum 3 short sentences. No medical jargon.
+Medicine: {medicine_data.get('medicine_name')}
+Uses: {medicine_data.get('uses')}
+Side effects: {medicine_data.get('side_effects')}"""
                 }
             ],
             max_tokens=150
         )
         return response.choices[0].message.content
     except Exception as e:
+        print(f"Simplify error: {str(e)}")
         return medicine_data.get("simple_explanation", "Please consult a doctor.")
